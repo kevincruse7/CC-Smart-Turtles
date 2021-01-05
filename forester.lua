@@ -1,85 +1,148 @@
-local turtle_utils = require('turtle_utils')
+local turtle_utils = require('/lib/turtle_utils')
+local Directions = turtle_utils.Directions
 
-local DISTANCE_TO_FIRST_SAPLING = 3
-local FARM_LENGTH = 8
+local COLLECTION_RADIUS = 3
 local PAUSE_TIME = 1200
-local SAPLING_NAME = 'minecraft:oak_sapling'
+local ROW_LENGTH = 8
+local ROWS 4
+local SAPLING_ID = 'minecraft:oak_sapling'
 local TREE_HEIGHT = 7
 
-local function outOfSaplings()
+function main()
 
-  local slot_data = turtle.getItemDetail(1)
-  return slot_data == nil
-      or slot_data.name ~= SAPLING_NAME
-      or slot_data.count <= FARM_LENGTH
-end
+  local position = turtle_utils.createPosition()
 
-local function plantSaplings(position)
+  turtle_utils.indicateRunning()
+  while true do
+    if outOfSaplings() then
+      turtle_utils.turn(position, turtle_utils.PICKUP_DIRECTION)
 
-  turtle_utils.turn(position, '+z')
-  turtle_utils.moveForward(position, DISTANCE_TO_FIRST_SAPLING + FARM_LENGTH - 1)
-  turtle_utils.moveUp(position, 1)
-  turtle_utils.turn(position, '-z')
-  
-  for i = 1, FARM_LENGTH, 1 do
-    local successful = turtle.placeDown()
-    while not successful do
-      turtle_utils.pause('Sapling placement')
-      successful = turtle.placeDown()
+      turtle_utils.pickUp(position)
+      while outOfSaplings() do
+        turtle_utils.pause('Sapling restock')
+
+        turtle_utils.pickUp(position)
+      end
     end
-    
-    turtle_utils.moveForward(position, 1)
+
+    harvestTrees(position)
+    plantSaplings(position)
+
+    sleep(PAUSE_TIME)
   end
-  
-  turtle_utils.goHome(position)
-  turtle_utils.turn(position, '+z')
 end
 
 local function harvestRow(position)
 
-  for i = 1, FARM_LENGTH - 1, 1 do
+  harvestWoodLayer(position)
+  for i = 1, TREE_HEIGHT - 1, 1 do
+    turtle_utils.digUp(position)
+    turtle_utils.moveUp(position, 1)
+
+    if position.current.direction == Directions.POS_Z then
+      turtle_utils.turn(position, Directions.NEG_Z)
+    else
+      turtle_utils.turn(position, Directions.POS_Z)
+    end
+
+    harvestWoodLayer(position)
+  end
+
+  turtle_utils.moveDown(position, TREE_HEIGHT - 1)
+end
+
+local function harvestTrees(position)
+
+  turtle_utils.turn(position, Directions.POS_Z)
+  turtle_utils.moveForward(position, COLLECTION_RADIUS)
+  turtle_utils.dig(position)
+  turtle_utils.moveForward(position, 1)
+
+  harvestRow(position)
+  for i = 1, ROWS - 1, 1 do
+    turtle_utils.turn(position, Directions.POS_X)
+    turtle_utils.moveForward(position, 2 * COLLECTION_RADIUS - 1)
+    turtle_utils.dig(position)
+    turtle_utils.moveForward(position, 1)
+
+    if position.current.z == COLLECTION_RADIUS + 1 then
+      turtle_utils.turn(position, Directions.POS_Z)
+    else
+      turtle_utils.turn(position, Directions.NEG_Z)
+    end
+
+    harvestRow(position)
+  end
+
+  turtle_utils.goHome(position)
+  turtle_utils.turn(position, turtle_utils.DROP_DIRECTION)
+  turtle_utils.dropItems(position)
+end
+
+local function harvestWoodLayer(position)
+
+  for i = 1, ROW_LENGTH - 1, 1 do
     turtle_utils.dig(position)
     turtle_utils.moveForward(position, 1)
   end
 end
 
-local function harvestTrees(position)
+local function outOfSaplings()
 
-  turtle_utils.moveForward(position, DISTANCE_TO_FIRST_SAPLING - 1)
-  turtle_utils.dig(position)
+  local slot_data = turtle.getItemDetail(1)
+  return slot_data == nil
+      or slot_data.name ~= SAPLING_ID
+      or slot_data.count < ROWS * ROW_LENGTH
+end
+
+local function placeSapling()
+
+  local successful = turtle.placeDown()
+  while not successful do
+    turtle_utils.pause('Sapling placement')
+    successful = turtle.placeDown()
+  end
+end
+
+local function plantRow(position)
+
+  placeSapling()
+  for i = 1, ROW_LENGTH - 1, 1 do
+    turtle_utils.moveForward(position, 1)
+    placeSapling()
+  end
+end
+
+local function plantSaplings(position)
+
+  turtle_utils.turn(position, Directions.POS_Z)
+  turtle_utils.moveForward(position, COLLECTION_RADIUS)
+  turtle_utils.turn(position, Directions.POS_X)
+  turtle_utils.moveForward(position, 2 * COLLECTION_RADIUS * (ROWS - 1))
+  turtle_utils.turn(position, Directions.POS_Z)
   turtle_utils.moveForward(position, 1)
-  
-  harvestRow(position)
-  for i = 1, TREE_HEIGHT - 1, 1 do
-    turtle_utils.digUp(position)
-    turtle_utils.moveUp(position, 1)
-    
-    if position.current.direction == '+z' then
-      turtle_utils.turn(position, '-z')
-    else
-      turtle_utils.turn(position, '+z')
-    end
-    
-    harvestRow(position)
+  turtle_utils.moveUp(position, 1)
+
+  if math.fmod(ROWS, 2) == 1 then
+    turtle_utils.moveForward(position, ROW_LENGTH - 1)
+    turtle_utils.turn(position, Directions.NEG_Z)
   end
+
+  plantRow(position)
+  for i = 1, ROWS - 1, 1 do
+    turtle_utils.turn(position, Directions.NEG_X)
+    turtle_utils.moveForward(position, COLLECTION_RADIUS)
+
+    if position.current.z == COLLECTION_RADIUS + 1 then
+      turtle_utils.turn(position, Directions.POS_Z)
+    else
+      turtle_utils.turn(position, Directions.NEG_Z)
+    end
+
+    plantRow(position)
+  end
+
+  turtle_utils.goHome(position)
 end
 
-turtle_utils.indicateRunning()
-local position = turtle_utils.position
-while true do
-  if outOfSaplings() then
-    turtle_utils.pickup(position)
-    
-    while outOfSaplings() do
-      turtle_utils.pause('Sapling restock')
-      turtle_utils.pickup(position)
-    end
-  end
-  
-  plantSaplings(position)
-  sleep(PAUSE_TIME)
-  harvestTrees(position)
-  
-  turtle_utils.goHome(position)
-  turtle_utils.dropAll(position)
-end
+main()
