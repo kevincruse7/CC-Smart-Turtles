@@ -339,6 +339,7 @@ local function checkPositionIntegrity(position)
   checkDirectionValidity(position.saved.direction)
 end
 
+-- Checks that the given number of steps is non-negative
 local function checkStepsValidity(steps)
 
   steps = tonumber(steps)
@@ -346,11 +347,13 @@ local function checkStepsValidity(steps)
   return steps
 end
 
+-- Goes home and drops off all disposable items in the designated drop direction
 local function dropItemsAtHome(position)
 
   savePosition(position)
   goHome(position)
 
+  turn(position, DROP_DIRECTION)
   dropItems(position)
 
   if not hasEnoughFuel(position, calcReturnSteps()) then
@@ -360,6 +363,7 @@ local function dropItemsAtHome(position)
   returnToSaved(position)
 end
 
+-- Determines if the turtle has enough fuel to move the specified number of steps
 local function hasEnoughFuel(position, steps)
 
   return 2 * (
@@ -370,11 +374,13 @@ local function hasEnoughFuel(position, steps)
   ) <= turtle.getFuelLevel()
 end
 
+-- Determines if the turtle's disposable inventory is full
 local function isInventoryFull()
 
   return turtle.getItemCount(LAST_DISPOSABLE_SLOT) > 0
 end
 
+-- Moves the turtle one step down
 local function moveOneStepDown(position)
 
   local successful = false
